@@ -2,7 +2,9 @@
 /// Name: James Murray - C00272116
 /// Date: 09/11/23
 /// Programme Purpose: Make a default collider for different collision types
-/// Known Bugs/Errors: None
+/// Known Bugs/Errors:
+/// 1) ray_AABB is incomplete, can't figure out how to structure if statement in code to check for collisions having occurred. Layout of function in place.
+/// 2) ray_Capsule is dependant on an Axis-Aligned Rectangle for it's centre as it currently stands. [Error] (Proposed Fix: Duplicate Process from ray_AABB but modify code to be more flexible - Use ray_Circle for inspiration[Specifically code for sensing where Ray is in releation to Rectangle edges])
 /// </summary>
 
 #include <iostream>
@@ -45,16 +47,21 @@ void c2Capsule_Circle(Capsule capsule, Circle circle); //Capsule to Circle Colli
 void rectangle_Rectangle(Rectangle rectangle1, Rectangle rectangle2); //Rectangle to Rectangle Collisions
 void c2AABB_AABB_Circle(AABB aabb1, AABB aabb2, Circle circle); //Axis-Aligned Bounding Box to Axis-Aligned Bounding Box to Circle Collisions
 void ray_Circle(Ray ray, Circle circle); //Ray to Circle Collisions
-void ray_AABB(Ray ray, AABB aabb); //Ray to AABB Collisions |***Gotten To Here***|
+struct Point getPointOfIntersection(Ray ray1, Ray ray2); //Ray to Ray Intersection Points(Collisions)
+void ray_AABB(Ray ray, AABB aabb); //Ray to AABB Collisions
 void ray_Capsule(Ray ray, Capsule capsule); //Ray to Capsule Collisions
+void AABB_Capsule(AABB aabb, Capsule capsule); //AABB to Capsule Collisions
 void c2Ray_Circle_AABB_Capsule(Ray ray, Circle circle, AABB aabb, Capsule capsule); //Ray to Circle to Axis-Aligned Bounding Boxes to Capsule Collisions
 
-int main()
-{
-    std::cout << "Hello World!\n";
-
-    return 0;
-}
+//For Testing Build & Compile:
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//int main()
+//{
+//    std::cout << "Hello World!\n";
+//
+//    return 0;
+//}
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 /// <summary>
 /// Types of Collisions To Emulate:
@@ -234,6 +241,23 @@ void ray_Circle(Ray ray, Circle circle) {
 #endif
 }
 
+//Ray to Ray Intersection Point(Collisions)
+struct Point getPointOfIntersection(Ray ray1, Ray ray2) {
+    // Need to Get the equation of the line [y = mx + c] for each ray, to then plug into line intersection formula
+    float ray1_slope = (ray1.y_EndPoint - ray1.y_StartPoint) / (ray1.x_EndPoint - ray1.x_StartPoint);
+    float ray1_c = ray1.y_StartPoint / (ray1_slope * ray1.x_StartPoint);
+
+    float ray2_slope = (ray2.y_EndPoint - ray2.y_StartPoint) / (ray2.x_EndPoint - ray2.x_StartPoint);
+    float ray2_c = ray2.y_StartPoint / (ray2_slope * ray2.x_StartPoint);
+
+    // Formula for finding point of intersection between lines: (x, y) = ((b1c2-b2c1)/(a1b2-a2b1), (c1a2-c2a1)/(a1b2-a2b1))
+    Point pointOfIntersection;
+    pointOfIntersection.x = (ray2_c - ray1_c) / (ray1_slope - ray2_slope); //(b1*c2-b2*c1)/(a1*b2-a2*b1) | b's must equal 1 for formulas to remain consistent
+    pointOfIntersection.y = ((ray1_c * ray2_slope) - (ray2_c * ray1_slope) / (ray1_slope - ray2_slope)); //(c1*a2-c2*a1)/(a1*b2-a2*b1) | b's must equal 1 for formulas to remain consistent
+
+    return pointOfIntersection;
+}
+
 //Ray to AABB Collisions
 void ray_AABB(Ray ray, AABB aabb) {
     bool collide = false;
@@ -256,12 +280,14 @@ void ray_AABB(Ray ray, AABB aabb) {
     rectHeightRay2.x_StartPoint = aabb.rectangle.x + aabb.rectangle.width; rectHeightRay2.y_StartPoint = aabb.rectangle.y; //Start Point
     rectHeightRay2.x_EndPoint = aabb.rectangle.x + aabb.rectangle.width; rectHeightRay2.y_EndPoint = aabb.rectangle.y + aabb.rectangle.height; //End Point
 
-    // Need to Get the equation of the line for each ray, to then plug into line intersection formula
-    // Intersection of 2 lines formula (w/4 itterations)
-    // Formula for finding point of intersection between lines: (x, y) = ((b1c2-b2c1)/(a1b2-a2b1), (c1a2-c2a1)/(a1b2-a2b1))
-    Point pointOfIntersection;
-    pointOfIntersection.x; //(b1*c2-b2*c1)/(a1*b2-a2*b1)
-    pointOfIntersection.y; //(c1*a2-c2*a1)/(a1*b2-a2*b1)
+    Point intersection1 = getPointOfIntersection(ray, rectWidthRay1);
+    //if (intersection1 == point on the line or ray) { collide = true; }
+    Point intersection2 = getPointOfIntersection(ray, rectWidthRay2);
+    //if (intersection2 == point on the line or ray) { collide = true; }
+    Point intersection3 = getPointOfIntersection(ray, rectHeightRay1);
+    //if (intersection3 == point on the line or ray) { collide = true; }
+    Point intersection4 = getPointOfIntersection(ray, rectHeightRay2);
+    //if (intersection4 == point on the line or ray) { collide = true; }
 
     if (collide == true)
     {
@@ -275,6 +301,12 @@ void ray_AABB(Ray ray, AABB aabb) {
 //Ray to Capsule Collisions
 void ray_Capsule(Ray ray, Capsule capsule) {
     bool collide = false;
+    AABB capRect;
+    capRect.rectangle = capsule.rectangle;
+
+    ray_Circle(ray, capsule.circle1);
+    ray_AABB(ray, capRect); //Ray - Rectangle | Needs Fixing to not be Axis-Aligned Specific
+    ray_Circle(ray, capsule.circle2);
 
     if (collide == true)
     {
@@ -285,18 +317,33 @@ void ray_Capsule(Ray ray, Capsule capsule) {
 #endif
 }
 
+//AABB to Capsule Collisions
+void AABB_Capsule(AABB aabb, Capsule capsule) {
+    bool collide = false;
+
+    rectangle_Circle(aabb.rectangle, capsule.circle1);
+    rectangle_Rectangle(aabb.rectangle, capsule.rectangle);
+    rectangle_Circle(aabb.rectangle, capsule.circle2);
+
+    if (collide == true)
+    {
+        std::cout << "Collision\n";
+    }
+#ifdef DEBUG
+    std::cout << "AABB to capsule collision check complete\n";
+#endif
+}
+
 //Ray to Circle to Axis-Aligned Bounding Boxes to Capsule Collisions
 void c2Ray_Circle_AABB_Capsule(Ray ray, Circle circle, AABB aabb, Capsule capsule) {
     bool collide = false;
 
-    /// Ray - Circle
-    /// Ray - AABB
-    /// Ray - Capsule
-    /// Circle - AABB
-    /// Circle - Capsule
-    /// AABB - Capsule
-    
-
+    ray_Circle(ray, circle);
+    ray_AABB(ray, aabb);
+    ray_Capsule(ray, capsule);
+    rectangle_Circle(aabb.rectangle, circle);
+    c2Capsule_Circle(capsule, circle);
+    AABB_Capsule(aabb, capsule);
 
     if (collide == true)
     {
